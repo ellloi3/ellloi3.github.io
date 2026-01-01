@@ -67,6 +67,15 @@ p{margin:0 0 18px 0;color:var(--muted)}
 
 .footer{margin-top:16px;text-align:right}
 
+/* layout */
+.select-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.home-actions{display:flex;gap:10px;flex-wrap:wrap}
+.auth-grid{display:flex;gap:18px;flex-wrap:wrap}
+.auth-card{background:var(--card);padding:12px;border-radius:10px;width:320px}
+.auth-card input{width:100%;padding:8px;margin-top:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+.shop-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+
+/* Battle styles (same as previous) */
 .arena{display:flex;gap:18px;align-items:center;justify-content:space-between}
 .fighter{width:34%;background:var(--card);padding:12px;border-radius:10px;display:flex;gap:10px;align-items:center;flex-direction:column}
 .fighter.player{align-items:flex-start}
@@ -84,7 +93,7 @@ p{margin:0 0 18px 0;color:var(--muted)}
 .buttons{display:flex;gap:8px}
 .buttons button{min-width:80px}
 
-/* Visual arena (animated) */
+/* Visual arena */
 .visual-arena{
   width:100%;
   height:150px;
@@ -108,8 +117,6 @@ p{margin:0 0 18px 0;color:var(--muted)}
   transition:transform .25s ease, filter .12s ease, opacity .12s ease;
   filter:drop-shadow(0 6px 12px rgba(0,0,0,0.45));
 }
-
-/* impact visual */
 .impact{
   position:absolute;
   left:50%;
@@ -119,11 +126,9 @@ p{margin:0 0 18px 0;color:var(--muted)}
   transition:opacity .12s ease;
   z-index:10;
 }
-.impact.show{
-  opacity:1;
-}
+.impact.show{opacity:1}
 
-/* Attack animation: attacker lunges forward and back */
+/* animations */
 @keyframes lunge-player {
   0%{ transform: translateX(0) scale(1); }
   40%{ transform: translateX(16px) scale(1.03); }
@@ -143,27 +148,15 @@ p{margin:0 0 18px 0;color:var(--muted)}
   60% { transform: translateX(-3px) rotate(-2deg); }
   100% { transform: translateX(0) rotate(0); }
 }
-.attack.player {
-  animation: lunge-player .45s ease forwards;
-}
-.attack.ai {
-  animation: lunge-ai .45s ease forwards;
-}
-.hit {
-  animation: hit-shake .28s ease;
-  filter: brightness(1.2) contrast(1.05) saturate(1.2);
-}
+.attack.player { animation: lunge-player .45s ease forwards; }
+.attack.ai { animation: lunge-ai .45s ease forwards; }
+.hit { animation: hit-shake .28s ease; filter: brightness(1.2) contrast(1.05) saturate(1.2); }
+.special { box-shadow: 0 0 28px 6px rgba(255,255,255,0.12), 0 8px 30px rgba(165, 80, 255, 0.12); transform: scale(1.03); transition: box-shadow .12s ease, transform .12s ease; }
 
-/* special glow */
-.special {
-  box-shadow: 0 0 28px 6px rgba(255,255,255,0.12), 0 8px 30px rgba(165, 80, 255, 0.12);
-  transform: scale(1.03);
-  transition: box-shadow .12s ease, transform .12s ease;
-}
+/* small helpers */
+.shake{ animation: hit-shake .28s ease; }
 
-.result-emoji{font-size:48px;margin-bottom:8px}
-
-/* Colors for avatars - simple placeholders */
+/* Colors for avatars placeholders */
 .avatar.color-lloyd{background:linear-gradient(180deg,#a7f3d0,#34d399)}
 .avatar.color-kai{background:linear-gradient(180deg,#fecaca,#f97316)}
 .avatar.color-jay{background:linear-gradient(180deg,#bfdbfe,#3b82f6)}
