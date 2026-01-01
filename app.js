@@ -1,6 +1,8 @@
 // app.js
-// Simple client-side app for selecting a LEGO Ninjago fighter and fighting an AI opponent.
-// The "AI" is a lightweight decision function that picks a random opponent and chooses actions based on simple heuristics.
+// Updated to support much higher HP per character (1000-1400) and to require
+// a character-specific number of normal attacks before that character can use Special.
+// Special becomes available only after performing `specialRequired` attacks,
+// and using Special resets the attack counter for that character.
 
 (() => {
   // DOM references
@@ -39,7 +41,7 @@
   // App state
   let playerChar = null;
   let aiChar = null;
-  let state = null; // { playerHP, aiHP, autoMode, turn: 'player'|'ai' }
+  let state = null; // { playerHP, aiHP, autoMode, turn, playerAttacks, aiAttacks, aiDefend }
 
   // Utilities
   function showScreen(name) {
@@ -60,7 +62,7 @@
         <div class="avatar ${c.colorClass}">${c.short}</div>
         <div class="info">
           <div class="name">${c.name}</div>
-          <div class="desc">HP ${c.maxHP} • ATK ${c.attackMin}-${c.attackMax}</div>
+          <div class="desc">HP ${c.maxHP} • ATK ${c.attackMin}-${c.attackMax} • Special after ${c.specialRequired} attacks</div>
         </div>
       `;
       card.addEventListener('click', () => onSelectCharacter(c.id));
@@ -85,7 +87,10 @@
       playerHP: playerChar.maxHP,
       aiHP: aiChar.maxHP,
       autoMode: false,
-      turn: 'player' // player goes first
+      turn: 'player', // player goes first
+      playerAttacks: 0,
+      aiAttacks: 0,
+      aiDefend: false
     };
 
     // render UI
@@ -97,7 +102,7 @@
     aiNameEl.textContent = aiChar.name;
 
     updateHPUI();
-    battleLog.innerHTML = `<div>Opponent: <strong>${aiChar.name}</strong> has been chosen by the AI.</div>`;
+    appendLog(`<div>Opponent: <strong>${aiChar.name}</strong> has been chosen by the AI.</div>`);
     showScreen('battle');
   }
 
@@ -114,6 +119,20 @@
     else playerHPBar.style.background = 'linear-gradient(90deg,#34d399,#10b981)';
     if (aPerc < 30) aiHPBar.style.background = 'linear-gradient(90deg,#f97316,#ef4444)';
     else aiHPBar.style.background = 'linear-gradient(90deg,#34d399,#10b981)';
+
+    updateSpecialUI();
+  }
+
+  function updateSpecialUI() {
+    // Player special availability
+    const pReq = playerChar.specialRequired;
+    const pHave = state.playerAttacks;
+    const pReady = pHave >= pReq;
+    specialBtn.disabled = !pReady;
+    specialBtn.textContent = pReady ? `Special (Ready)` : `Special (${pHave}/${pReq})`;
+
+    // Auto button text remains
+    autoBtn.textContent = state.autoMode ? 'Auto: ON' : 'Auto';
   }
 
   // Simple damage calculation
@@ -122,36 +141,65 @@
     return Math.round(base * (isSpecial ? attacker.specialMultiplier : 1));
   }
 
-  function appendLog(text) {
+  function appendLog(html) {
     const el = document.createElement('div');
-    el.innerHTML = text;
+    el.innerHTML = html;
     battleLog.prepend(el); // newest on top
   }
 
-  // AI decision function (lightweight "AI")
+  // AI decision function (uses attack count restriction for special)
   function aiChooseAction() {
-    // Heuristics:
-    // - If AI HP is low (<30%), high chance to defend (here we simulate a weaker action reducing incoming damage)
-    // - If player HP is low, higher chance to special
-    // - Otherwise random between 'attack' and 'special'
     const aiHPPercent = state.aiHP / aiChar.maxHP;
     const playerHPPercent = state.playerHP / playerChar.maxHP;
     let roll = Math.random();
 
+    // If AI has defense incentive
     if (aiHPPercent < 0.3 && roll < 0.6) return 'defend';
-    if (playerHPPercent < 0.25 && roll < 0.7) return 'special';
-    // otherwise 70% attack, 30% special
-    return (roll < 0.7) ? 'attack' : 'special';
+
+    // If AI has enough attacks to use special and conditions are favorable
+    if (state.aiAttacks >= aiChar.specialRequired) {
+      if (playerHPPercent < 0.25 && roll < 0.75) return 'special';
+      if (roll < 0.65) return 'attack';
+      return 'special';
+    }
+
+    // Not ready for special yet → prefer attack
+    return (roll < 0.85) ? 'attack' : 'defend';
   }
 
   // Player action handlers
   function playerAttack(isSpecial=false) {
     if (!state) return;
     if (state.turn !== 'player') return;
+
+    // Special use gating for player (double-check)
+    if (isSpecial) {
+      if (state.playerAttacks < playerChar.specialRequired) {
+        appendLog(`<em>Special not ready — you need ${playerChar.specialRequired - state.playerAttacks} more attack(s).</em>`);
+        return;
+      }
+    }
+
     const dmg = calcDamage(playerChar, isSpecial);
-    // AI defend possibility is handled on AI turn; but we can add a small random guard chance
-    state.aiHP -= dmg;
-    appendLog(`<strong>${playerChar.name}</strong> ${isSpecial ? 'used SPECIAL' : 'attacks'} and deals <strong>${dmg}</strong> damage!`);
+    let finalDmg = dmg;
+
+    // If AI is defending, reduce damage and clear defend
+    if (state.aiDefend) {
+      finalDmg = Math.round(finalDmg * 0.5); // defend reduces incoming damage by 50%
+      state.aiDefend = false;
+      appendLog(`<em>${aiChar.name} braces, reducing damage.</em>`);
+    }
+
+    state.aiHP -= finalDmg;
+
+    if (isSpecial) {
+      appendLog(`<strong>${playerChar.name}</strong> used SPECIAL and deals <strong>${finalDmg}</strong> damage!`);
+      state.playerAttacks = 0; // reset charge after special
+    } else {
+      appendLog(`<strong>${playerChar.name}</strong> attacks and deals <strong>${finalDmg}</strong> damage!`);
+      state.playerAttacks = (state.playerAttacks || 0) + 1;
+    }
+
     updateHPUI();
     checkBattleEndThenProceed('player');
   }
@@ -170,15 +218,16 @@
     // switch to other turn
     if (lastActor === 'player') {
       state.turn = 'ai';
-      // if auto mode trigger delay for AI turn
+      // AI acts after a short delay
       setTimeout(aiTurn, 700);
     } else {
       state.turn = 'player';
       // if auto mode trigger next player action automatically
       if (state.autoMode) {
         setTimeout(() => {
-          // auto choose best action: if AI HP low -> attack, else sometimes special
-          const choice = (state.aiHP / aiChar.maxHP < 0.35) ? 'attack' : ((Math.random() < 0.4) ? 'special' : 'attack');
+          // pick action for auto player: use special only if ready
+          const pReady = state.playerAttacks >= playerChar.specialRequired;
+          const choice = pReady ? ((Math.random() < 0.45) ? 'special' : 'attack') : 'attack';
           if (choice === 'special') playerAttack(true); else playerAttack(false);
         }, 600);
       }
@@ -187,23 +236,25 @@
 
   function aiTurn() {
     if (!state || state.turn !== 'ai') return;
-    const action = aiChooseAction();
+    let action = aiChooseAction();
+
+    // Ensure AI doesn't attempt special if not charged (safety)
+    if (action === 'special' && state.aiAttacks < aiChar.specialRequired) {
+      action = 'attack';
+    }
 
     if (action === 'defend') {
-      // defending reduces damage on next player attack -> simulate as a temporary buff: heal a tiny amount and note defended
       appendLog(`<em>${aiChar.name} defends and braces for impact.</em>`);
-      // apply a small heal or shield effect by storing a defend flag
       state.aiDefend = true;
-      // end AI turn
       checkBattleEndThenProceed('ai');
       return;
     }
 
     if (action === 'attack') {
       const dmg = calcDamage(aiChar, false);
-      // if player has defend effect? (we did not implement player defend)
       state.playerHP -= dmg;
       appendLog(`<strong>${aiChar.name}</strong> attacks and deals <strong>${dmg}</strong> damage!`);
+      state.aiAttacks = (state.aiAttacks || 0) + 1;
       updateHPUI();
       checkBattleEndThenProceed('ai');
       return;
@@ -211,17 +262,20 @@
 
     if (action === 'special') {
       const dmg = calcDamage(aiChar, true);
-      // if player had defend reduce damage
       state.playerHP -= dmg;
       appendLog(`<strong>${aiChar.name}</strong> uses SPECIAL and deals <strong>${dmg}</strong> damage!`);
+      state.aiAttacks = 0; // reset AI charge after special
       updateHPUI();
       checkBattleEndThenProceed('ai');
       return;
     }
+
+    // fallback
+    checkBattleEndThenProceed('ai');
   }
 
   function endBattle(didPlayerWin) {
-    // clear state.autoMode
+    // clear autoMode
     state.autoMode = false;
     if (didPlayerWin) {
       winText.textContent = `You defeated ${aiChar.name}!`;
@@ -247,14 +301,7 @@
 
   specialBtn.addEventListener('click', () => {
     if (!state) return;
-    // special has a small chance to miss: add small risk
-    if (Math.random() < 0.12) {
-      appendLog(`<strong>${playerChar.name}</strong> tried a SPECIAL but missed!`);
-      // switch to AI turn
-      state.turn = 'ai';
-      setTimeout(aiTurn, 600);
-      return;
-    }
+    // Player special gating handled inside playerAttack
     playerAttack(true);
   });
 
@@ -265,10 +312,12 @@
     if (state.autoMode && state.turn === 'player') {
       // kick off automatic actions
       setTimeout(() => {
-        const choice = (Math.random() < 0.35) ? 'special' : 'attack';
+        const pReady = state.playerAttacks >= playerChar.specialRequired;
+        const choice = pReady ? ((Math.random() < 0.35) ? 'special' : 'attack') : 'attack';
         if (choice === 'special') playerAttack(true); else playerAttack(false);
       }, 400);
     }
+    updateSpecialUI();
   });
 
   winToSelect.addEventListener('click', () => {
