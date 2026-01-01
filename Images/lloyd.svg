@@ -1,0 +1,11 @@
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="100%" height="100%" rx="20" fill="#a7f3d0"/>
+  <g transform="translate(24,24)">
+    <rect x="0" y="60" width="192" height="84" rx="14" fill="#34d399" />
+    <circle cx="96" cy="36" r="34" fill="#07203a"/>
+    <text x="96" y="44" font-family="Arial,Segoe UI" font-size="36" fill="#a7f3d0" font-weight="700" text-anchor="middle">LL</text>
+    <text x="96" y="150" font-family="Arial,Segoe UI" font-size="14" fill="#07203a" text-anchor="middle">Lloyd</text>
+  </g>
+</svg>
+```
