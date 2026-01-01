@@ -1,12 +1,12 @@
-// app.js (updated: damage popups added)
-// Uses existing game logic + leaderboard/shops. I only added popup functions and invoked them where damage is applied.
+// app.js — updated to add Achievements (client-side, localStorage-based)
+// This file keeps authentication, shop, leaderboard, battle, damage popups, etc.
+// New: achievements tracked per user under users[username].stats and users[username].achievements
 
-// (All previous code for auth, shop, leaderboard, characters, etc. is retained — only the popup logic and call sites are new/updated.)
-// For brevity I'm including the full app.js here (copy over your existing app.js) — the popup logic is located near showDamagePopup and calls in playerAttack and aiTurn.
-
+// Storage keys
 const STORAGE_KEY_USERS = 'ninjago_users_v1';
 const STORAGE_KEY_CURRENT = 'ninjago_current_user_v1';
 
+// Weapon definitions and limits
 const WEAPONS = [
   { id: 'sword', name: 'Katana', baseCost: 120, dmgMinPerLevel: 6, dmgMaxPerLevel: 10, desc: 'Balanced attack sword' },
   { id: 'nunchucks', name: 'Nunchucks', baseCost: 140, dmgMinPerLevel: 8, dmgMaxPerLevel: 12, desc: 'Faster strikes' },
@@ -16,6 +16,7 @@ const WEAPONS = [
 ];
 const MAX_WEAPON_LEVEL = 10;
 
+// storage helpers
 function loadUsers() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_USERS);
@@ -35,6 +36,7 @@ function loadCurrent() {
   return localStorage.getItem(STORAGE_KEY_CURRENT) || '';
 }
 
+// password hashing (SHA-256)
 async function hashPassword(password, salt) {
   const enc = new TextEncoder();
   const data = enc.encode(password + salt);
@@ -46,7 +48,7 @@ function randomSalt() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-// DOM refs
+// DOM references
 const screens = {
   auth: document.getElementById('auth'),
   home: document.getElementById('home'),
@@ -54,6 +56,7 @@ const screens = {
   battle: document.getElementById('battle'),
   shop: document.getElementById('shop'),
   leaderboard: document.getElementById('leaderboard'),
+  achievements: document.getElementById('achievements'),
   profile: document.getElementById('profile'),
   win: document.getElementById('win'),
   lose: document.getElementById('lose')
@@ -75,6 +78,7 @@ const goSelect = document.getElementById('goSelect');
 const goShop = document.getElementById('goShop');
 const goProfile = document.getElementById('goProfile');
 const goLeaderboard = document.getElementById('goLeaderboard');
+const goAchievements = document.getElementById('goAchievements');
 const signOutBtn = document.getElementById('signOutBtn');
 
 // Select
@@ -110,6 +114,10 @@ const shopCoins = document.getElementById('shopCoins');
 const leaderboardList = document.getElementById('leaderboardList');
 const leaderboardBack = document.getElementById('leaderboardBack');
 
+// Achievements
+const achievementsList = document.getElementById('achievementsList');
+const achievementsBack = document.getElementById('achievementsBack');
+
 // Profile
 const profileUser = document.getElementById('profileUser');
 const profileCoins = document.getElementById('profileCoins');
@@ -123,29 +131,136 @@ const loseToSelect = document.getElementById('loseToSelect');
 const winText = document.getElementById('winText');
 const loseText = document.getElementById('loseText');
 
-// State
-let users = loadUsers();
-let currentUser = loadCurrent() || '';
-let session = null; // reference to users[currentUser]
+// App state
+let users = loadUsers(); // object keyed by username
+let currentUser = loadCurrent() || ''; // username string
+let session = null; // currently logged-in user object reference users[currentUser]
 let playerChar = null;
 let aiChar = null;
-let state = null;
+let state = null; // battle state
 let selectedDifficulty = Number(difficultySelect.value) || 5;
 
+// ACHIEVEMENTS metadata
+const ACHIEVEMENTS = [
+  { id: 'first_win', title: 'First Victory', desc: 'Win your first battle', check: (s) => (s.stats.wins || 0) >= 1, badge: 'bronze' },
+  { id: 'five_wins', title: 'Five Wins', desc: 'Win 5 battles', check: (s) => (s.stats.wins || 0) >= 5, badge: 'bronze' },
+  { id: 'ten_wins', title: 'Ten Wins', desc: 'Win 10 battles', check: (s) => (s.stats.wins || 0) >= 10, badge: 'silver' },
+  { id: 'win_streak_5', title: 'Streak: 5', desc: 'Win 5 battles in a row', check: (s) => (s.stats.winStreak || 0) >= 5, badge: 'bronze' },
+  { id: 'diff10_win', title: 'Conqueror (10)', desc: 'Win a battle at difficulty 10', check: (s) => (s.stats.winsByDifficulty && s.stats.winsByDifficulty[10] >= 1), badge: 'gold' },
+  { id: 'master_collector', title: 'Master Collector', desc: 'Buy 50 weapon levels total', check: (s) => (s.stats.purchases || 0) >= 50, badge: 'silver' },
+  { id: 'rich', title: 'Rich!', desc: 'Earn a total of 5000 coins (lifetime)', check: (s) => (s.totalEarned || 0) >= 5000, badge: 'gold' },
+  { id: 'specialist', title: 'Specialist', desc: 'Use Special 50 times', check: (s) => (s.stats.specialUses || 0) >= 50, badge: 'bronze' },
+  { id: 'heavy_hitter', title: 'Heavy Hitter', desc: 'Deal a single-hit of 400+ damage', check: (s) => (s.stats.highestDamage || 0) >= 400, badge: 'silver' },
+  { id: 'defeat_all', title: 'Slayer', desc: 'Defeat every other character at least once', check: (s) => {
+      const set = s.stats.defeated || {};
+      return Object.keys(set).length >= (CHARACTERS.length - 1);
+    }, badge: 'gold' },
+  { id: 'play_100', title: 'Veteran', desc: 'Play 100 battles', check: (s) => (s.stats.totalBattles || 0) >= 100, badge: 'gold' }
+];
+
+// Helper: ensure user object has stats and achievements fields
+function ensureUserFields(u) {
+  u.stats = u.stats || {
+    wins: 0,
+    losses: 0,
+    winStreak: 0,
+    totalBattles: 0,
+    specialUses: 0,
+    purchases: 0,
+    highestDamage: 0,
+    defeated: {},
+    winsByDifficulty: {}
+  };
+  u.achievements = u.achievements || {}; // id => timestamp
+  u.totalEarned = u.totalEarned || (u.coins || 0); // if missing
+  u.upgrades = u.upgrades || {};
+  u.settings = u.settings || { difficulty: 5 };
+}
+
+// Persist user changes helper
+function persistSession() {
+  if (!currentUser) return;
+  users[currentUser] = session;
+  saveUsers(users);
+  // update UI numbers
+  userCoinsEl.textContent = session.coins || 0;
+  shopCoins.textContent = session.coins || 0;
+  profileCoins.textContent = session.coins || 0;
+}
+
+// Show small toast when achievement unlocked
+function showAchievementToast(title, desc) {
+  const existing = document.querySelector('.achievement-toast');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.className = 'achievement-toast';
+  div.innerHTML = `<strong>${title}</strong><div style="font-size:13px;color:#cbd5e1;margin-top:6px">${desc}</div>`;
+  document.body.appendChild(div);
+  // animate
+  setTimeout(() => div.classList.add('show'), 50);
+  setTimeout(() => div.classList.remove('show'), 3500);
+  setTimeout(() => div.remove(), 4000);
+}
+
+// Check and unlock achievements for a user (returns list of newly unlocked ids)
+function checkAndUnlockAchievementsForUser(u) {
+  ensureUserFields(u);
+  const unlocked = [];
+  ACHIEVEMENTS.forEach(a => {
+    if (!u.achievements[a.id] && a.check(u)) {
+      u.achievements[a.id] = Date.now();
+      unlocked.push(a);
+    }
+  });
+  if (unlocked.length) {
+    saveUsers(users);
+    unlocked.forEach(a => showAchievementToast(a.title, a.desc));
+  }
+  return unlocked.map(a => a.id);
+}
+
+// Helper: show achievements screen
+function renderAchievementsScreen() {
+  achievementsList.innerHTML = '';
+  if (!session) {
+    achievementsList.innerHTML = '<div class="muted">Sign in to see achievements.</div>';
+    return;
+  }
+  ensureUserFields(session);
+  ACHIEVEMENTS.forEach(a => {
+    const unlocked = !!session.achievements[a.id];
+    const card = document.createElement('div');
+    card.className = 'achievement' + (unlocked ? '' : ' locked');
+    const badgeClass = unlocked ? (a.badge === 'gold' ? 'gold' : (a.badge === 'silver' ? 'silver' : 'bronze')) : '';
+    card.innerHTML = `
+      <div class="badge ${badgeClass}">${unlocked ? '★' : '?'}</div>
+      <div class="meta">
+        <div class="title">${a.title}</div>
+        <div class="desc">${a.desc}</div>
+        ${unlocked ? `<div style="margin-top:8px;font-size:12px;color:var(--muted)">Unlocked: ${new Date(session.achievements[a.id]).toLocaleString()}</div>` : ''}
+      </div>
+    `;
+    achievementsList.appendChild(card);
+  });
+}
+
+// UI helpers
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('visible'));
   if (screens[name]) screens[name].classList.add('visible');
 }
 
+// Authentication flow
 function refreshAuthUI() {
   if (currentUser && users[currentUser]) {
     session = users[currentUser];
+    ensureUserFields(session);
     currentUserName.textContent = currentUser;
-    userCoinsEl.textContent = session.coins;
+    userCoinsEl.textContent = session.coins || 0;
     selectUserName.textContent = currentUser;
-    shopCoins.textContent = session.coins;
+    shopCoins.textContent = session.coins || 0;
     profileUser.textContent = currentUser;
-    profileCoins.textContent = session.coins;
+    profileCoins.textContent = session.coins || 0;
     showScreen('home');
   } else {
     session = null;
@@ -153,7 +268,7 @@ function refreshAuthUI() {
   }
 }
 
-// Sign up
+// signup
 signupBtn.addEventListener('click', async () => {
   const username = (signupUser.value || '').trim();
   const password = (signupPass.value || '').trim();
@@ -167,15 +282,15 @@ signupBtn.addEventListener('click', async () => {
   }
   const salt = randomSalt();
   const hash = await hashPassword(password, salt);
-  const startingCoins = 500;
   const newUser = {
     passwordHash: hash,
     salt,
-    coins: startingCoins,
-    totalEarned: startingCoins,
+    coins: 500,
+    totalEarned: 500,
     upgrades: {},
     settings: { difficulty: 5 }
   };
+  ensureUserFields(newUser);
   users[username] = newUser;
   saveUsers(users);
   currentUser = username;
@@ -183,7 +298,7 @@ signupBtn.addEventListener('click', async () => {
   refreshAuthUI();
 });
 
-// Sign in
+// signin
 signinBtn.addEventListener('click', async () => {
   const username = (signinUser.value || '').trim();
   const password = (signinPass.value || '').trim();
@@ -200,7 +315,7 @@ signinBtn.addEventListener('click', async () => {
   refreshAuthUI();
 });
 
-// Sign out
+// sign out
 signOutBtn.addEventListener('click', () => {
   saveCurrent('');
   currentUser = '';
@@ -208,7 +323,7 @@ signOutBtn.addEventListener('click', () => {
   refreshAuthUI();
 });
 
-// Delete account
+// delete account
 deleteAccountBtn.addEventListener('click', () => {
   if (!currentUser) return;
   if (!confirm(`Delete account ${currentUser}? This cannot be undone (data only in your browser).`)) return;
@@ -235,7 +350,8 @@ goShop.addEventListener('click', () => {
 shopBack.addEventListener('click', () => showScreen('home'));
 goProfile.addEventListener('click', () => { renderProfile(); showScreen('profile'); });
 goLeaderboard.addEventListener('click', () => { renderLeaderboard(); showScreen('leaderboard'); });
-leaderboardBack && leaderboardBack.addEventListener('click', () => showScreen('home'));
+goAchievements.addEventListener('click', () => { renderAchievementsScreen(); showScreen('achievements'); });
+achievementsBack && achievementsBack.addEventListener('click', () => showScreen('home'));
 
 difficultySelect.addEventListener('change', () => {
   selectedDifficulty = Number(difficultySelect.value);
@@ -247,7 +363,7 @@ difficultySelect.addEventListener('change', () => {
   }
 });
 
-// ---- Character rendering and select ----
+// Character rendering
 function svgToDataUri(svgString) {
   if (!svgString) return '';
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString.trim());
@@ -280,7 +396,7 @@ function renderCharacters() {
   });
 }
 
-// ---- Shop logic ----
+// Shop
 function populateShopCharSelect() {
   shopSelectChar.innerHTML = '';
   CHARACTERS.forEach(c => {
@@ -342,6 +458,8 @@ function renderWeaponsForShop() {
       const cost = costToBuyNext(w, lvl);
       if (session.coins < cost) { alert('Not enough coins'); return; }
       session.coins -= cost;
+      // record purchase stat (for achievements)
+      session.stats.purchases = (session.stats.purchases || 0) + 1;
       setUserUpgradeLevel(currentUser, charId, w.id, lvl + 1);
       users[currentUser] = session;
       saveUsers(users);
@@ -349,11 +467,13 @@ function renderWeaponsForShop() {
       userCoinsEl.textContent = session.coins;
       profileCoins.textContent = session.coins;
       renderWeaponsForShop();
+      checkAndUnlockAchievementsForUser(session);
     });
     weaponsList.appendChild(card);
   });
 }
 
+// profile rendering
 function renderProfile() {
   if (!session) return;
   profileUser.textContent = currentUser;
@@ -378,7 +498,7 @@ function renderProfile() {
   });
 }
 
-// Leaderboard
+// leaderboard
 function renderLeaderboard() {
   leaderboardList.innerHTML = '';
   const arr = Object.keys(users).map(username => {
@@ -408,7 +528,9 @@ function renderLeaderboard() {
   });
 }
 
-// ---- Battle logic ----
+/* ----------------
+   Battle functions
+   ---------------- */
 function computeEffectiveCharStats(char, username) {
   const base = Object.assign({}, char);
   let up = (users[username] && users[username].upgrades && users[username].upgrades[char.id]) || {};
@@ -429,6 +551,7 @@ function coinsRewardForWin(baseReward = 100, difficulty = 5) {
   return Math.max(10, Math.round(baseReward * mult + bonus));
 }
 
+// select character & start battle
 function onSelectCharacter(id) {
   playerChar = CHARACTERS.find(ch => ch.id === id);
   startBattle();
@@ -516,21 +639,14 @@ function calcDamage(attacker, isSpecial=false) {
   return Math.round(base * (isSpecial ? attacker.specialMultiplier : 1));
 }
 
+// logging helper
 function appendLog(html) {
   const el = document.createElement('div');
   el.innerHTML = html;
   battleLog.prepend(el);
 }
 
-/* ---------------------------
-   Damage popup implementation
-   --------------------------- */
-/*
- showDamagePopup(side, amount, isSpecial)
- side: 'player' or 'ai' — the defender who received the damage
- amount: number
- isSpecial: boolean
-*/
+/* Damage popup implementation (same as before) */
 function showDamagePopup(side, amount, isSpecial=false) {
   try {
     const arena = document.querySelector('.visual-arena');
@@ -538,39 +654,23 @@ function showDamagePopup(side, amount, isSpecial=false) {
     const popup = document.createElement('div');
     popup.className = 'damage-popup';
     if (isSpecial) popup.classList.add('special');
-
-    // small chance for crit style if amount is high relative to attackMax (optional)
-    // (Here we mark as crit if amount is in top 8% of possible max)
     const defender = (side === 'ai') ? aiArt : playerArt;
     popup.textContent = `-${amount}`;
-
-    // compute position: center above defender image
     const arenaRect = arena.getBoundingClientRect();
     const defRect = defender.getBoundingClientRect();
-
-    // coordinates relative to arena
     const x = (defRect.left + defRect.right) / 2 - arenaRect.left;
-    const y = defRect.top - arenaRect.top + 10; // slightly below top of image
-
+    const y = defRect.top - arenaRect.top + 10;
     popup.style.left = `${x}px`;
     popup.style.top = `${y}px`;
     popup.style.transform = 'translate(-50%, 0)';
-
     arena.appendChild(popup);
-
-    // remove after animation (match CSS animation duration ~900ms)
-    setTimeout(() => {
-      popup.remove();
-    }, 1000);
+    setTimeout(() => { try { popup.remove(); } catch(e){} }, 1000);
   } catch (e) {
-    // don't break game if popups fail
     console.error('showDamagePopup error', e);
   }
 }
 
-/* ---------------------------
-   Visual attack animator
-   --------------------------- */
+/* Visual attack animator (same as before) */
 function animateAttack(side, isSpecial=false) {
   const attackerImg = side === 'player' ? playerArt : aiArt;
   const defenderImg = side === 'player' ? aiArt : playerArt;
@@ -594,7 +694,7 @@ function animateAttack(side, isSpecial=false) {
   }, 700);
 }
 
-// AI decision
+/* AI decision (same as before) */
 function aiChooseAction() {
   const aiHPPercent = state.aiHP / state.aiEffectiveChar.maxHP;
   const playerHPPercent = state.playerHP / state.playerEffectiveChar.maxHP;
@@ -612,6 +712,7 @@ function aiChooseAction() {
   return (roll < (0.85 - diff*0.03)) ? 'attack' : 'defend';
 }
 
+/* Player action handlers (with achievement-tracking hooks) */
 function playerAttack(isSpecial=false) {
   if (!state) return;
   if (state.turn !== 'player') return;
@@ -634,13 +735,22 @@ function playerAttack(isSpecial=false) {
   if (isSpecial) {
     appendLog(`<strong>${playerChar.name}</strong> used SPECIAL and deals <strong>${finalDmg}</strong> damage!`);
     state.playerAttacks = 0;
+    // track special use
+    if (session) { session.stats.specialUses = (session.stats.specialUses || 0) + 1; }
   } else {
     appendLog(`<strong>${playerChar.name}</strong> attacks and deals <strong>${finalDmg}</strong> damage!`);
     state.playerAttacks = (state.playerAttacks || 0) + 1;
   }
 
+  // track highest damage
+  if (session) {
+    session.stats.highestDamage = Math.max(session.stats.highestDamage || 0, finalDmg);
+    persistSession();
+  }
+
   // show popup on AI (defender)
   showDamagePopup('ai', finalDmg, isSpecial);
+
   animateAttack('player', isSpecial);
   updateHPUI();
   checkBattleEndThenProceed('player');
@@ -707,27 +817,46 @@ function aiTurn() {
   checkBattleEndThenProceed('ai');
 }
 
+/* End battle: update stats, coins, achievements */
 function endBattle(didPlayerWin) {
   if (session) {
-    const diff = state.difficulty || 5;
+    // update stats
+    session.stats.totalBattles = (session.stats.totalBattles || 0) + 1;
     if (didPlayerWin) {
-      const reward = coinsRewardForWin(50, diff);
+      session.stats.wins = (session.stats.wins || 0) + 1;
+      session.stats.winStreak = (session.stats.winStreak || 0) + 1;
+      // record defeated character
+      session.stats.defeated = session.stats.defeated || {};
+      session.stats.defeated[aiChar.id] = true;
+      // record wins by difficulty
+      session.stats.winsByDifficulty = session.stats.winsByDifficulty || {};
+      session.stats.winsByDifficulty[state.difficulty] = (session.stats.winsByDifficulty[state.difficulty] || 0) + 1;
+
+      const reward = coinsRewardForWin(50, state.difficulty || 5);
       session.coins = (session.coins || 0) + reward;
       session.totalEarned = (session.totalEarned || 0) + reward;
       appendLog(`<em>You earned ${reward} coins for this victory.</em>`);
       alert(`Victory! You earned ${reward} coins.`);
     } else {
+      session.stats.losses = (session.stats.losses || 0) + 1;
+      session.stats.winStreak = 0;
       const consolation = Math.max(5, Math.round(5 * (state.difficulty || 1)));
       session.coins = (session.coins || 0) + consolation;
       session.totalEarned = (session.totalEarned || 0) + consolation;
       appendLog(`<em>Consolation: ${consolation} coins.</em>`);
       alert(`Defeat. You received ${consolation} consolation coins.`);
     }
+
+    // persist and check achievements
     users[currentUser] = session;
     saveUsers(users);
+    // update UI coin numbers
     userCoinsEl.textContent = session.coins;
     shopCoins.textContent = session.coins;
     profileCoins.textContent = session.coins;
+
+    // check achievements (this will also show toasts for newly unlocked)
+    checkAndUnlockAchievementsForUser(session);
   }
 
   state.autoMode = false;
@@ -775,6 +904,8 @@ document.addEventListener('keydown', (e) => {
 (function init() {
   users = loadUsers();
   currentUser = loadCurrent();
+  // ensure all users have stats/achievements if older data exists
+  Object.keys(users).forEach(k => { ensureUserFields(users[k]); });
   refreshAuthUI();
   renderCharacters();
   populateShopCharSelect();
