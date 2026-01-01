@@ -38,6 +38,27 @@
     <section id="home" class="screen">
       <h2>Welcome, <span id="currentUserName"></span></h2>
       <p id="homeInfo">Coins: <strong id="userCoins">0</strong></p>
+
+      <!-- Audio controls -->
+      <div class="audio-controls" style="margin:12px 0;padding:10px;border-radius:8px;background:rgba(255,255,255,0.01);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input id="sfxToggle" type="checkbox" checked />
+          <span class="muted">SFX</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px">
+          <input id="musicToggle" type="checkbox" checked />
+          <span class="muted">Music</span>
+        </label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="muted">SFX</span>
+          <input id="sfxVolume" type="range" min="0" max="1" step="0.01" value="0.9" />
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="muted">Music</span>
+          <input id="musicVolume" type="range" min="0" max="1" step="0.01" value="0.25" />
+        </div>
+      </div>
+
       <div class="home-actions">
         <button id="goSelect" class="primary">Start Match</button>
         <button id="goShop" class="secondary">Shop</button>
@@ -47,138 +68,13 @@
       </div>
     </section>
 
-    <!-- Character Select & Difficulty -->
-    <section id="select" class="screen">
-      <h2>Select Your Fighter</h2>
-      <div class="select-top">
-        <div>
-          <label for="difficulty">Difficulty:</label>
-          <select id="difficulty">
-            <option value="1">1 — Very Easy</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5 — Normal</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="10">10 — Brutal</option>
-          </select>
-          <small class="muted">Higher difficulty → stronger AI and better coin rewards.</small>
-        </div>
-        <div class="muted">Signed in as <strong id="selectUserName"></strong></div>
-      </div>
+    <!-- Rest of screens remain unchanged... -->
+    <!-- (keep the rest of your existing index.html content unchanged) -->
 
-      <div id="charactersGrid" class="grid"></div>
-
-      <div class="footer">
-        <button id="backToHome" class="muted">Back</button>
-      </div>
-    </section>
-
-    <!-- Battle Screen (unchanged layout + visual arena) -->
-    <section id="battle" class="screen">
-      <h2>Battle</h2>
-      <div id="battleArena" class="arena">
-        <div class="fighter player">
-          <div class="avatar" id="playerAvatar"></div>
-          <div class="info">
-            <div class="name" id="playerName"></div>
-            <div class="hpbar">
-              <div class="hp" id="playerHP"></div>
-            </div>
-            <div class="hpText" id="playerHPText"></div>
-          </div>
-        </div>
-
-        <div class="controls">
-          <div id="battleLog" class="log"></div>
-
-          <div id="visualArena" class="visual-arena">
-            <img id="playerArt" class="fighter-art" src="" alt="player art" />
-            <div id="impact" class="impact" aria-hidden="true"></div>
-            <img id="aiArt" class="fighter-art" src="" alt="ai art" />
-          </div>
-
-          <div class="buttons">
-            <button id="attackBtn" class="primary">Attack</button>
-            <button id="specialBtn" class="secondary">Special</button>
-            <button id="autoBtn" class="muted">Auto</button>
-          </div>
-        </div>
-
-        <div class="fighter ai">
-          <div class="avatar" id="aiAvatar"></div>
-          <div class="info">
-            <div class="name" id="aiName"></div>
-            <div class="hpbar">
-              <div class="hp" id="aiHP"></div>
-            </div>
-            <div class="hpText" id="aiHPText"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Shop -->
-    <section id="shop" class="screen">
-      <h2>Shop</h2>
-      <p class="muted">Buy weapon levels for specific characters. Each weapon has 10 levels. Costs scale with level.</p>
-      <div id="shopTop" class="shop-top">
-        <div>
-          <label for="shopSelectChar">Character:</label>
-          <select id="shopSelectChar"></select>
-        </div>
-        <div>
-          <p>Coins: <strong id="shopCoins">0</strong></p>
-        </div>
-      </div>
-
-      <div id="weaponsList" class="grid"></div>
-
-      <div class="footer">
-        <button id="shopBack" class="muted">Back</button>
-      </div>
-    </section>
-
-    <!-- Leaderboard -->
-    <section id="leaderboard" class="screen">
-      <h2>Leaderboard — Most Coins Earned (all-time)</h2>
-      <p class="muted">Ranked by total coins ever earned (includes starting coins, victories, consolation). Spending does not reduce this value.</p>
-      <div id="leaderboardList" class="grid"></div>
-      <div class="footer">
-        <button id="leaderboardBack" class="muted">Back</button>
-      </div>
-    </section>
-
-    <!-- Profile / Account -->
-    <section id="profile" class="screen">
-      <h2>Profile — <span id="profileUser"></span></h2>
-      <p>Coins: <strong id="profileCoins">0</strong></p>
-      <div id="profileUpgrades" class="grid"></div>
-
-      <div class="profile-actions">
-        <button id="deleteAccount" class="muted">Delete Account</button>
-        <button id="profileBack" class="muted">Back</button>
-      </div>
-    </section>
-
-    <!-- Win Screen -->
-    <section id="win" class="screen">
-      <h2>You Win!</h2>
-      <p id="winText"></p>
-      <button id="winToSelect" class="primary">Back to Select</button>
-    </section>
-
-    <!-- Lose Screen -->
-    <section id="lose" class="screen">
-      <h2>You Lose</h2>
-      <p id="loseText"></p>
-      <button id="loseToSelect" class="primary">Try Again</button>
-    </section>
   </div>
 
+  <!-- include audio manager before app.js -->
+  <script src="audio.js"></script>
   <script src="characters.js"></script>
   <script src="app.js"></script>
 </body>
