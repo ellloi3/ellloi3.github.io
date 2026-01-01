@@ -3,28 +3,80 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LEGO Ninjago Smash - AI Fighter</title>
+  <title>LEGO Ninjago Smash — Accounts, Shop & Difficulty</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="app">
-    <!-- Home / Landing -->
-    <section id="home" class="screen visible">
+    <!-- Auth / Landing -->
+    <section id="auth" class="screen visible">
       <h1>LEGO Ninjago Smash</h1>
-      <p>Pick your Ninjago fighter and battle an AI opponent.</p>
-      <button id="startBtn" class="primary">Start</button>
+      <p id="authMsg">Sign in or sign up to save progress and buy upgrades.</p>
+
+      <div class="auth-grid">
+        <div class="auth-card">
+          <h3>Sign In</h3>
+          <input id="signinUser" placeholder="Username" />
+          <input id="signinPass" type="password" placeholder="Password" />
+          <button id="signinBtn" class="primary">Sign In</button>
+        </div>
+
+        <div class="auth-card">
+          <h3>Sign Up</h3>
+          <input id="signupUser" placeholder="Choose username" />
+          <input id="signupPass" type="password" placeholder="Choose password" />
+          <button id="signupBtn" class="primary">Sign Up</button>
+        </div>
+      </div>
+
+      <div class="auth-footer">
+        <p class="muted">Local accounts stored in your browser only. Usernames must be unique.</p>
+      </div>
     </section>
 
-    <!-- Character Select -->
+    <!-- Home when signed in -->
+    <section id="home" class="screen">
+      <h2>Welcome, <span id="currentUserName"></span></h2>
+      <p id="homeInfo">Coins: <strong id="userCoins">0</strong></p>
+      <div class="home-actions">
+        <button id="goSelect" class="primary">Start Match</button>
+        <button id="goShop" class="secondary">Shop</button>
+        <button id="goProfile" class="muted">Profile</button>
+        <button id="signOutBtn" class="muted">Sign Out</button>
+      </div>
+    </section>
+
+    <!-- Character Select & Difficulty -->
     <section id="select" class="screen">
       <h2>Select Your Fighter</h2>
+      <div class="select-top">
+        <div>
+          <label for="difficulty">Difficulty:</label>
+          <select id="difficulty">
+            <option value="1">1 — Very Easy</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5 — Normal</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10 — Brutal</option>
+          </select>
+          <small class="muted">Higher difficulty → stronger AI and better coin rewards.</small>
+        </div>
+        <div class="muted">Signed in as <strong id="selectUserName"></strong></div>
+      </div>
+
       <div id="charactersGrid" class="grid"></div>
+
       <div class="footer">
         <button id="backToHome" class="muted">Back</button>
       </div>
     </section>
 
-    <!-- Battle Screen -->
+    <!-- Battle Screen (unchanged layout + visual arena) -->
     <section id="battle" class="screen">
       <h2>Battle</h2>
       <div id="battleArena" class="arena">
@@ -42,7 +94,6 @@
         <div class="controls">
           <div id="battleLog" class="log"></div>
 
-          <!-- Visual arena placed under the log: shows images and animations -->
           <div id="visualArena" class="visual-arena">
             <img id="playerArt" class="fighter-art" src="" alt="player art" />
             <div id="impact" class="impact" aria-hidden="true"></div>
@@ -69,6 +120,39 @@
       </div>
     </section>
 
+    <!-- Shop -->
+    <section id="shop" class="screen">
+      <h2>Shop</h2>
+      <p class="muted">Buy weapon levels for specific characters. Each weapon has 10 levels. Costs scale with level.</p>
+      <div id="shopTop" class="shop-top">
+        <div>
+          <label for="shopSelectChar">Character:</label>
+          <select id="shopSelectChar"></select>
+        </div>
+        <div>
+          <p>Coins: <strong id="shopCoins">0</strong></p>
+        </div>
+      </div>
+
+      <div id="weaponsList" class="grid"></div>
+
+      <div class="footer">
+        <button id="shopBack" class="muted">Back</button>
+      </div>
+    </section>
+
+    <!-- Profile / Account -->
+    <section id="profile" class="screen">
+      <h2>Profile — <span id="profileUser"></span></h2>
+      <p>Coins: <strong id="profileCoins">0</strong></p>
+      <div id="profileUpgrades" class="grid"></div>
+
+      <div class="profile-actions">
+        <button id="deleteAccount" class="muted">Delete Account</button>
+        <button id="profileBack" class="muted">Back</button>
+      </div>
+    </section>
+
     <!-- Win Screen -->
     <section id="win" class="screen">
       <h2>You Win!</h2>
@@ -82,7 +166,6 @@
       <p id="loseText"></p>
       <button id="loseToSelect" class="primary">Try Again</button>
     </section>
-
   </div>
 
   <script src="characters.js"></script>
