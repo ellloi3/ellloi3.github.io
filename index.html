@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LEGO Ninjago Smash - AI Fighter</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Home / Landing -->
+    <section id="home" class="screen visible">
+      <h1>LEGO Ninjago Smash</h1>
+      <p>Pick your Ninjago fighter and battle an AI opponent.</p>
+      <button id="startBtn" class="primary">Start</button>
+    </section>
+
+    <!-- Character Select -->
+    <section id="select" class="screen">
+      <h2>Select Your Fighter</h2>
+      <div id="charactersGrid" class="grid"></div>
+      <div class="footer">
+        <button id="backToHome" class="muted">Back</button>
+      </div>
+    </section>
+
+    <!-- Battle Screen -->
+    <section id="battle" class="screen">
+      <h2>Battle</h2>
+      <div id="battleArena" class="arena">
+        <div class="fighter player">
+          <div class="avatar" id="playerAvatar"></div>
+          <div class="info">
+            <div class="name" id="playerName"></div>
+            <div class="hpbar">
+              <div class="hp" id="playerHP"></div>
+            </div>
+            <div class="hpText" id="playerHPText"></div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div id="battleLog" class="log"></div>
+          <div class="buttons">
+            <button id="attackBtn" class="primary">Attack</button>
+            <button id="specialBtn" class="secondary">Special</button>
+            <button id="autoBtn" class="muted">Auto</button>
+          </div>
+        </div>
+
+        <div class="fighter ai">
+          <div class="avatar" id="aiAvatar"></div>
+          <div class="info">
+            <div class="name" id="aiName"></div>
+            <div class="hpbar">
+              <div class="hp" id="aiHP"></div>
+            </div>
+            <div class="hpText" id="aiHPText"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Win Screen -->
+    <section id="win" class="screen">
+      <h2>You Win!</h2>
+      <p id="winText"></p>
+      <button id="winToSelect" class="primary">Back to Select</button>
+    </section>
+
+    <!-- Lose Screen -->
+    <section id="lose" class="screen">
+      <h2>You Lose</h2>
+      <p id="loseText"></p>
+      <button id="loseToSelect" class="primary">Try Again</button>
+    </section>
+
+  </div>
+
+  <script src="characters.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
